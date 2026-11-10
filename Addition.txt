@@ -1,0 +1,376 @@
+Addition
+MVI C,00
+MVI A, XX
+MVI B, YY
+ADD B
+STA 2001
+JNC GO
+INR C
+MOV A, C
+STA 2002
+GO:HLT
+
+subtraction
+MVI C,00
+MVI A,XX
+MVI B,YY
+SUB B
+JNC GO
+INR C
+CMA
+INR A
+GO:STA 2004
+MOV A,C
+STA 2005
+HLT
+
+multiplication
+LXI H,0000
+LXI D,0000
+LDA 2000
+MOV E,A
+LDA 2001
+MOV C,A
+GO:DAD D
+DCR C
+JNZ GO
+SHLD 2002
+#ORG 2000
+#DB XX,YY
+
+Division
+LXI H,2000
+MOV B,M
+MVI C,00
+INX H
+MOV A,M
+REPEAT:CMP B
+JC CARRY
+SUB B
+INR C
+JMP REPEAT
+CARRY:STA 2002
+MOV A,C
+STA 2003
+HLT
+#ORG 2000
+#DB XX,YY
+
+largest number
+LXI H,8200
+MOV B,M
+INX H
+MOV A,M
+DCR B
+LOOP: INX H
+CMP M
+JNC AHEAD and for smallest number put JC AHEAD
+MOV A,M
+AHEAD: DCR B
+JNZ LOOP
+STA 8300
+HLT
+
+Digital to analog
+#include "LPC2148.h"
+void InitializeDAC(void);
+int main (void)
+{
+long c;
+InitializeDAC(); //Initialize DAC
+while(1)
+{ DACR = 0x00; // Set DAC = 0
+for(c=0;c<0xf0000;c++); // Delay
+DACR = 0x0000ffc0; // Set DAC = (0x3ff << 6)
+for(c=0;c<0xf0000;c++); // Delay
+}}
+void InitializeDAC(void)
+{
+PINSEL1 = 0x00080000; // Set P0.25 for DAC output
+}
+
+ADC
+#include "LPC2148.h"
+int ReadADC(char ChannelNumber);
+int main(void)
+{
+int a;
+unsigned char Channel = 2;
+PINSEL1 = 0x04000000; // Select ADC to pin P0.29
+InitializeLCD(); // Initialize LCD
+DisplayLCD(0," "); // Display message
+DisplayLCD(1,"Channel 2: "); // Display message
+while(1)
+{
+a=ReadADC(Channel); // Read ADC channel 2
+DisplayLCD2Digit(1,10, (a >> 8)); // Display it on 2nd line of LCD
+DisplayLCD2Digit(1,12, (a & 0xff));
+LCDDelay1600();
+}
+}
+//Read ADC data from given channel number
+int ReadADC(char ChannelNumber)
+{
+int val,ch;
+ch = 1<<ChannelNumber;
+AD0CR = 0x00210400 | ch; // Setup A/D: 10-bit AIN @ 3MHz
+AD0CR |= 0x01000000; // Start A/D Conversion
+do
+{
+val = AD0DR2; // Read A/D Data Register
+}while ((val & 0x80000000) == 0); // Wait for the conversion to complete
+val = ((val >> 6) & 0x03FF); // Extract the A/D result
+AD0CR &= ~0x01000000; // Stop A/D Conversion
+return(val); // Return the Data Read
+}
+
+Room temperature
+#include "LPC214x.h"
+int ReadADC(char ChannelNumber);
+int main(void)
+{
+int a;
+unsigned char Channel = 1, t[7];
+PINSEL1 = 0x01000000; // Select pin function for ADC (e.g., AD0.1)
+InitializeLCD(); // Initialize LCD
+DisplayLCD(0, " Room Temperature"); // Display message on LCD
+while (1)
+{
+a = ReadADC(Channel); // Read ADC value from specified channel
+// Convert integer value to string format for display
+t[0] = a / 100 + '0';
+a -= (a / 100) * 100;
+t[1] = a / 10 + '0';
+t[2] = '.';
+t[3] = a % 10 + '0';
+t[4] = 'c';
+t[5] = 0;
+DisplayLCD(1, t); // Display temperature value on LCD
+LCDDelay1600(); // Delay for LCD refresh
+}
+}
+int ReadADC (char ChannelNumber)
+{
+int val, ch;
+ch = 1 << ChannelNumber; // Select the appropriate channel
+AD0CR = 0x00210400 | ch; // Configure ADC (PCLK/4, enable ADC)
+AD0CR |= 0x01000000; // Start conversion by setting the START bit
+// Wait for conversion to complete (Done bit set in AD0DR1)
+do
+{
+val = AD0DR1; // Read from the AD0DR1 register
+}
+while ((val & 0x80000000) == 0); // Wait for the DONE bit (bit 31)
+val = (val >> 6) & 0x03FF; // Extract the 10-bit ADC result
+AD0CR &= ~0x01000000; // Stop conversion by clearing the START bit
+return val; // Return the ADC value
+}
+
+Bit Manipulation
+Without delay
+#include <p18f452.h>
+void main(void)
+{
+TRISB = 0; // make port B an output
+
+for(;;) // repeat forever
+{
+PORTB = 0x55; // 0x indicates the data is in hex
+PORTB = 0xAA;
+}
+}
+
+with delay
+#include <p18f452.h>
+void msdelay(unsigned int);
+void main(void)
+{
+TRISB = 0; // make port B an output
+for(;;) // repeat forever
+{
+PORTB = 0x55; // 0x indicates the data is in hex
+msdelay(250);
+PORTB = 0xAA;
+msdelay(250);
+}
+}
+
+void msdelay(unsigned int itime)
+{
+unsigned int i;
+unsigned char j;
+
+for(i = 0; i < itime; i++);
+for(j = 0; j < itime; j++);
+}
+
+Checksum verification
+Check sum calculation:
+
+#include<p18f452.h>
+
+Void main(void) {
+
+Unsigned char mydata[4] =
+{0x25, 0x62, 0x3F, 0x52};
+
+Unsigned char checksum =
+0;
+
+Unsigned char I;
+
+Unsigned int sum = 0;
+
+TRISC = 0x00;
+
+TRISB = 0x00;
+
+For (I = 0; I < 4; i++) {
+
+PORTC = mydata[i]; //
+show each byte on PORTC
+Sum += mydata[i];
+
+}
+Check Sum = (Unsigned
+char)(~sum + 1);
+PORTB = checksum;
+}
+#include<p18f452.h>
+void main(void) {
+
+unsigned char mydata [4] = {0x25, 0x62, 0x3F, 0x52};
+unsigned char checksum = 0xE8; // From previous
+calculation
+unsigned char i;
+unsigned intsum = 0;
+TRISD =0; // PORTD output (to show
+result)
+
+checksum
+for (i = 0; i < 4; i++) {
+sum += mydata[i];
+
+// Step 1: Add all data +
+
+}
+sum += checksum;
+
+if ((unsigned char) sum == 0) {
+
+// Step 2: Check if result == 0
+
+PORTD = 'G'; // Send ASCII 'G' → GOOD
+} else
+{
+PORTD = 'B'; // Send ASCII 'B' → BAD
+}
+}
+
+
+BCD → ASCII
+#include <P18F458.h>
+void main(void)
+{
+unsigned char x, y;
+unsigned char mybyte = 0x29; // Example BCD value = 29 (BCD)
+
+TRISB = 0x00; // Set PORTB as output
+TRISC = 0x00; // Set PORTC as output
+
+// Extract lower nibble (ones digit)
+x = mybyte & 0x0F; // 0x29 & 0x0F = 0x09
+PORTB = x | 0x30; // 0x09 | 0x30 = 0x39 → ASCII '9'
+
+// Extract higher nibble (tens digit)
+y = (mybyte & 0xF0) >> 4; // (0x29 & 0xF0) >> 4 = 0x02
+PORTC = y | 0x30; // 0x02 | 0x30 = 0x32 → ASCII '2'
+
+while(1); // infinite loop
+}
+
+
+BLINK LED IN SEQUENCE:
+#include<p18f452.h>
+void delay(long j);
+void main()
+{
+TRISB = 0x00; // Set PORTB as output
+PORTB = 0x00; // Turn off all LEDs initially
+while(1)
+{
+PORTB = 0xFF;
+delay(500000);
+PORTB = 0x00;
+delay(500000);
+}
+}
+void delay(long j)
+{
+while(j--);
+}
+
+
+seven segment display
+#include<p18f452.h>
+void delay(int);
+void main()
+{
+int i,j;
+int a[8]={94,94,94,101}
+int b[8] = {8,4,2,1,8,4,2,1};
+
+TRISB=0;
+TRISD=0;
+
+while(1)
+{
+for(j=0;j<2000;j++)
+{
+for(i = 0; i<4;i++)
+{
+PORTB=a[i];
+PORTD=b[i];
+delay(200);
+}
+}
+PORTD=0;
+delay(62000);
+for(j=0;j<2000;j++)
+{
+for(i=4;i<8;i++)
+{
+PORTB=a[i];
+PORTD=b[i];
+delay(200);
+}
+}
+
+PORTD=0;
+delay(62000);
+}
+}
+
+void delay(int j)
+{
+while(j--);
+}
+
+
+PWM
+#include <p18f452.h>
+void main(void)
+{
+TRISCbits.TRISC2 = 0; // RC2/CCP1 as output
+CCP1CON = 0x00; // CCP1 off while configuring
+PR2 = 249; // PWM period
+CCPR1L = 186; // 75% duty cycle (upper 8 bits)
+T2CON = 0x00; // Timer2 prescaler = 1:1
+TMR2 = 0; // Clear Timer2
+T2CONbits.TMR2ON = 1; // Start Timer2
+CCP1CON = 0x3C; // PWM mode, DC1B<1:0> = 11
+while (1)
+{
+; // PWM runs entirely in hardware
+}
+}
